@@ -145,6 +145,8 @@ def train(epoch):
         a = x[0][:6]
         b = x_recon[0][:6]
 
+        # import pdb; pdb. set_trace() 
+
         print(a)
         print(b)
         print(f'{(a*a).sum()=} {((a-b) * (a-b)).sum()=}')
@@ -156,7 +158,13 @@ from torch.utils.data import TensorDataset, DataLoader
 # x = torch.load('ks1.pt').view(-1, 128)[:10*1024*1024]
 
 # x = torch.load('ks1.pt').view(-1, 128)[:1024*10]
-x = torch.load('layer0_all_head_ks.pt').view(-1, 128)[:1024*1000]
+# x = torch.load('layer0_all_head_ks.pt').view(-1, 128)[:1024*1000]
+# x = torch.load('ks_26G.pt').view(-1, 128)[:1024*1000]
+
+# [s, h, d]
+x = torch.load('shd_ks.pt')[:,0,:].view(-1, 128)[:1024*10]
+# x = torch.load('shd_ks.pt').view(-1, 128)[:1024*10]
+print(x.shape)
 x = x.to(device).to(torch.float32)
 idx = torch.randperm(x.size(0))
 x = x[idx]
@@ -178,7 +186,7 @@ train_loader = DataLoader(TensorDataset(x), batch_size=1024)
 
 
 # model = RQ(hidden_dim=128, k=256, n_codebook=4).to(device)
-model = RQ(hidden_dim=128, k=256, n_codebook=30).to(device)
+model = RQ(hidden_dim=128, k=256, n_codebook=4).to(device)
 # model = RQVAE(hidden_dim=128, k=4096, n_codebook=8).to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 num_epochs = 1000

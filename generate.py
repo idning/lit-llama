@@ -149,21 +149,28 @@ def main(
         y = generate(model, encoded, max_new_tokens, temperature=temperature, top_k=top_k)
         t = time.perf_counter() - t0
 
+        # import pdb; pdb. set_trace() 
+
         # for layer in range(len(model._forward_module.transformer.h)):
         for layer in range(1):
             # model._forward_module.kv_caches[layer][0].cpu()
-            ks.append(model._forward_module.kv_caches[layer][0].cpu().view(-1, 128))
-            vs.append(model._forward_module.kv_caches[layer][1].cpu().view(-1, 128))
+            
+            k = model._forward_module.kv_caches[layer][0].transpose(-2, -3).cpu()  # (B, H, S, D) -> (B, S, H, D)
+            v = model._forward_module.kv_caches[layer][1].transpose(-2, -3).cpu()  # (B, H, S, D) -> (B, S, H, D)
+
+            ks.append(k)
+            vs.append(v)
 
         model.reset_cache()
         print(tokenizer.decode(y))
         tokens_generated = y.size(0) - prompt_length
         print(f"Time for inference {i + 1}: {t:.02f} sec total, {tokens_generated / t:.02f} tokens/sec", file=sys.stderr)
+
     if fabric.device.type == "cuda":
         print(f"Memory used: {torch.cuda.max_memory_reserved() / 1e9:.02f} GB", file=sys.stderr)
     
-    ks = torch.stack(ks).view(-1, 128)
-    vs = torch.stack(vs).view(-1, 128)
+    ks = torch.cat(ks, dim=1).view(-1, 32, 128)
+    vs = torch.cat(vs, dim=1).view(-1, 32, 128)
     print(f'{ks.shape=}')
     print(f'{vs.shape=}')
 
