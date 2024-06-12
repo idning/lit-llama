@@ -19,6 +19,7 @@ class VQ(nn.Module):
         self.codebook.weight.data.uniform_(-1/k, 1/k)
 
     def forward(self, z):
+        self.most_recent_input = z
         # Calculate distances from the codebook
         distances = (z.unsqueeze(-2) - self.codebook.weight)**2.0  # (B, k, 256)
         distances = distances.sum(-1)  # (B, k)
@@ -33,6 +34,25 @@ class VQ(nn.Module):
 
         z_q_stright_through = z + (z_q - z).detach()
         return z_q_stright_through, ind, vq_loss + commitment_loss
+
+    def reset_unused_codebooks(self, mask: torch.Tensor,) -> None:  # replace codebook for mask == Ture, with random tensors from self.most_recent_input
+        """
+        replace_mask: shape (batch_size, codebook_cardinality)
+        """
+        with torch.no_grad():
+            # assert rank == 0
+            random_ids = torch.randint(
+                0,
+                self.most_recent_input.size(0),
+                (self.codebook.size(0),),
+                device=self.most_recent_input.device,
+            )
+            random_tensors = torch.index_select(  # (codebook_cardinality, emb_dim)
+                self.most_recent_input, 0, random_ids
+            )
+            self.codebook.data = torch.where(
+                mask[:, None], random_tensors, self.codebook.data
+            )
 
 class RQ(nn.Module):
     def __init__(self, hidden_dim=256, k=512, n_codebook=3):
@@ -83,8 +103,8 @@ class RQVAE(nn.Module):
         for a,b in zip(all_dims[:-1], all_dims[1:]):
             layers.append(nn.Linear(a, b))
             layers.append(nn.ReLU())
-        layers[-1] = nn.Sigmoid()
-        self.dec = nn.Sequential(*layers)  # do not include the last Relu
+        # layers[-1] = nn.Sigmoid()
+        self.dec = nn.Sequential(*layers[:-1])  # do not include the last Relu
 
     def forward(self, x):
         z_e = self.enc(x)
@@ -96,6 +116,7 @@ class RQVAE(nn.Module):
 def train(epoch):
     model.train()
     train_loss = 0
+    idxs = []
     for batch_idx, data in enumerate(train_loader):
         data = data[0]
         x = data.view(data.size(0), -1)
@@ -105,12 +126,21 @@ def train(epoch):
         dot_sim = (x * x_recon).sum(dim=1).mean()
 
         mse_loss = F.mse_loss(x_recon, x)
-        loss =  mse_loss + vq_loss
+        loss =  mse_loss + .1 * vq_loss
 
         loss.backward()
         train_loss += loss.item()
         optimizer.step()
-    if epoch % 100 == 0:
+        idxs.append(idx)
+
+    if epoch % 1 == 0:
+        # for i in range(model.n_codebook):
+        #     bin_count = torch.cat(idxs)[:, i].view(-1).bincount(minlength=256)
+
+        #     codebook_util = 1 - torch.sum(bin_count == 0).item() / 256
+        #     print(f'{i=} {codebook_util=}')
+        #     # print(bin_count)
+        #     # model.vq[i].reset_unused_codebooks(mask=idx[:, i] == 0)
         print(f"Epoch: {epoch} \t MSE: {mse_loss}, Loss: {train_loss / len(train_loader.dataset):.6f}, cosine: {cosine} dot: {dot_sim}")
         a = x[0][:6]
         b = x_recon[0][:6]
@@ -123,11 +153,14 @@ def train(epoch):
 
 import torch
 from torch.utils.data import TensorDataset, DataLoader
-x = torch.load('ks1.pt').view(-1, 128)[:10*1024*1024]
-x = torch.load('ks1.pt').view(-1, 128)[:1024]
+# x = torch.load('ks1.pt').view(-1, 128)[:10*1024*1024]
+
+# x = torch.load('ks1.pt').view(-1, 128)[:1024*10]
+x = torch.load('layer0_all_head_ks.pt').view(-1, 128)[:1024*1000]
 x = x.to(device).to(torch.float32)
 idx = torch.randperm(x.size(0))
 x = x[idx]
+
 
 mean = torch.mean(x)
 variance = torch.var(x)
@@ -139,13 +172,16 @@ x = (x - mean) / torch.sqrt(variance)
 # t = t/l2_norm
 
 # t = F.normalize(t, dim=-1, p=2.0)
+
+# x = torch.randn(1024*10, 128).to(device)
 train_loader = DataLoader(TensorDataset(x), batch_size=1024)
 
 
-model = RQ(hidden_dim=128, k=256, n_codebook=4).to(device)
-# model = RQVAE(hidden_dim=128, k=256, n_codebook=8).to(device)
+# model = RQ(hidden_dim=128, k=256, n_codebook=4).to(device)
+model = RQ(hidden_dim=128, k=256, n_codebook=30).to(device)
+# model = RQVAE(hidden_dim=128, k=4096, n_codebook=8).to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-num_epochs = 100000
+num_epochs = 1000
 for epoch in range(1, num_epochs + 1):
     train(epoch)
 

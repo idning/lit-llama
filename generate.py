@@ -149,7 +149,8 @@ def main(
         y = generate(model, encoded, max_new_tokens, temperature=temperature, top_k=top_k)
         t = time.perf_counter() - t0
 
-        for layer in range(len(model._forward_module.transformer.h)):
+        # for layer in range(len(model._forward_module.transformer.h)):
+        for layer in range(1):
             # model._forward_module.kv_caches[layer][0].cpu()
             ks.append(model._forward_module.kv_caches[layer][0].cpu().view(-1, 128))
             vs.append(model._forward_module.kv_caches[layer][1].cpu().view(-1, 128))
