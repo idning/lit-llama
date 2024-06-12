@@ -60,6 +60,7 @@ def generate(
     # generate max_new_tokens tokens
     for _ in range(max_new_tokens):
         x = idx.index_select(0, input_pos).view(1, -1)
+        # print(f'NNNNN: {input_pos=}, {x=}')
 
         # forward
         logits = model(x, max_seq_length, input_pos)
@@ -86,6 +87,7 @@ def generate(
         if idx_next == eos_id:
             return idx[:input_pos]  # include the EOS token
 
+    # import pdb; pdb. set_trace() 
     return idx
 
 
@@ -140,10 +142,17 @@ def main(
     prompt_length = encoded.size(0)
 
     L.seed_everything(1234)
+    ks = []
+    vs = []
     for i in range(num_samples):
         t0 = time.perf_counter()
         y = generate(model, encoded, max_new_tokens, temperature=temperature, top_k=top_k)
         t = time.perf_counter() - t0
+
+        for layer in range(len(model._forward_module.transformer.h)):
+            # model._forward_module.kv_caches[layer][0].cpu()
+            ks.append(model._forward_module.kv_caches[layer][0].cpu().view(-1, 128))
+            vs.append(model._forward_module.kv_caches[layer][1].cpu().view(-1, 128))
 
         model.reset_cache()
         print(tokenizer.decode(y))
@@ -151,6 +160,14 @@ def main(
         print(f"Time for inference {i + 1}: {t:.02f} sec total, {tokens_generated / t:.02f} tokens/sec", file=sys.stderr)
     if fabric.device.type == "cuda":
         print(f"Memory used: {torch.cuda.max_memory_reserved() / 1e9:.02f} GB", file=sys.stderr)
+    
+    ks = torch.stack(ks).view(-1, 128)
+    vs = torch.stack(vs).view(-1, 128)
+    print(f'{ks.shape=}')
+    print(f'{vs.shape=}')
+
+    torch.save(ks, 'ks.pt')
+    torch.save(vs, 'vs.pt')
 
 
 if __name__ == "__main__":
