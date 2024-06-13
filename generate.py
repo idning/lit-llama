@@ -151,15 +151,14 @@ def main(
 
         # import pdb; pdb. set_trace() 
 
+        n_layers = len(model._forward_module.transformer.h)
         # for layer in range(len(model._forward_module.transformer.h)):
-        for layer in range(1):
-            # model._forward_module.kv_caches[layer][0].cpu()
-            
-            k = model._forward_module.kv_caches[layer][0].transpose(-2, -3).cpu()  # (B, H, S, D) -> (B, S, H, D)
-            v = model._forward_module.kv_caches[layer][1].transpose(-2, -3).cpu()  # (B, H, S, D) -> (B, S, H, D)
+        # k = model._forward_module.kv_caches[layer][0].transpose(-2, -3).cpu()  # (B, H, S, D) -> (B, S, H, D)
+        k = torch.stack([model._forward_module.kv_caches[layer][0].transpose(-2, -3).cpu() for layer in range(n_layers)], dim=2)   # (B, S, L, H, D)
+        v = torch.stack([model._forward_module.kv_caches[layer][1].transpose(-2, -3).cpu() for layer in range(n_layers)], dim=2)   # (B, S, L, H, D)
 
-            ks.append(k)
-            vs.append(v)
+        ks.append(k)
+        vs.append(v)
 
         model.reset_cache()
         print(tokenizer.decode(y))
@@ -169,8 +168,10 @@ def main(
     if fabric.device.type == "cuda":
         print(f"Memory used: {torch.cuda.max_memory_reserved() / 1e9:.02f} GB", file=sys.stderr)
     
-    ks = torch.cat(ks, dim=1).view(-1, 32, 128)
-    vs = torch.cat(vs, dim=1).view(-1, 32, 128)
+    import pdb; pdb. set_trace()  
+    ks = torch.cat(ks, dim=1).squeeze(0)  # (B, S, L, H, D) -> (S, L, H, D)
+    vs = torch.cat(vs, dim=1).squeeze(0)  # (B, S, L, H, D) -> (S, L, H, D)
+    
     print(f'{ks.shape=}')
     print(f'{vs.shape=}')
 

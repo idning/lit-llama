@@ -165,7 +165,7 @@ from torch.utils.data import TensorDataset, DataLoader
 # x = torch.load('shd_ks.pt')[:,0,:].view(-1, 128)[:1024*10]
 # x = torch.load('shd_ks.pt').view(-1, 128)[:1024*10]
 
-x = torch.load('shd_ks.pt').view(-1, 128*32)[:1024*10]
+x = torch.load('slhd_ks.pt').view(-1, 128*32*32)[:1024*10]
 
 print(x.shape)
 x = x.to(device).to(torch.float32)
@@ -185,11 +185,11 @@ print(f'{mean=} {variance=}, {x.max()=}, {x.min()=}')
 # t = F.normalize(t, dim=-1, p=2.0)
 
 # x = torch.randn(1024*10, 128).to(device)
-train_loader = DataLoader(TensorDataset(x), batch_size=1024)
+train_loader = DataLoader(TensorDataset(x), batch_size=32)
 
 
 # model = RQ(hidden_dim=128, k=256, n_codebook=4).to(device)
-model = RQ(hidden_dim=128*32, k=256, n_codebook=4).to(device)
+model = RQ(hidden_dim=128*32*32, k=256, n_codebook=8).to(device)
 # model = RQVAE(hidden_dim=128, k=4096, n_codebook=8).to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 num_epochs = 1000
