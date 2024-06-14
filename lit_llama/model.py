@@ -45,6 +45,11 @@ llama_configs = {
     "65B": dict(n_layer=80, n_head=64, n_embd=8192),
 }
 
+runid='rqvae_50_epoch'
+rqvaes = {
+    'k': [torch.jit.load(f'{runid}/k{i:02}.jit.pt') for i in range(32)],
+    'v': [torch.jit.load(f'{runid}/v{i:02}.jit.pt') for i in range(32)],
+}
 
 class LLaMA(nn.Module):
     def __init__(self, config: LLaMAConfig) -> None:
@@ -112,6 +117,14 @@ class LLaMA(nn.Module):
                 ]
             for i, block in enumerate(self.transformer.h):
                 x, self.kv_caches[i] = block(x, rope, mask, max_seq_length, input_pos, self.kv_caches[i])
+
+                (B, H, S, D) = self.kv_caches[i][0].shape
+                # import pdb; pdb.set_trace() 
+                t_k = rqvaes['k'][i](self.kv_caches[i][0].float().transpose(-2, -3).reshape(-1, 128*32))[0].reshape(B, S, H, D).transpose(-2, -3).to(torch.bfloat16)
+                t_v = rqvaes['v'][i](self.kv_caches[i][1].float().transpose(-2, -3).reshape(-1, 128*32))[0].reshape(B, S, H, D).transpose(-2, -3).to(torch.bfloat16)
+
+                self.kv_caches[i] = (t_k, t_v)
+
 
         x = self.transformer.ln_f(x)
 

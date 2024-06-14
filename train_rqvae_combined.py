@@ -23,7 +23,7 @@ def train_on_tensor(x: torch.Tensor):
 
     model = RQ(hidden_dim=128*32, k=256, n_codebook=4).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-    num_epochs = 50
+    num_epochs = 200
 
     def train(epoch):
         model.train()
@@ -72,7 +72,7 @@ def train_on_tensor(x: torch.Tensor):
 import torch
 from torch.utils.data import TensorDataset, DataLoader
 
-runid = 'rqvae_50_epoch'
+runid = 'rqvae_200_epoch'
 os.makedirs(f'{runid}', exist_ok=True)
 
 models = {
