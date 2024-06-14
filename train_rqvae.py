@@ -16,7 +16,7 @@ class VQ(nn.Module):
     def __init__(self, hidden_dim=256, k=512):
         super(VQ, self).__init__()
         self.codebook = nn.Embedding(k, hidden_dim)
-        self.codebook = nn.Embedding(k, hidden_dim, dtype=torch.bfloat16)
+        # self.codebook = nn.Embedding(k, hidden_dim, dtype=torch.bfloat16)
         self.codebook.weight.data.uniform_(-1/k, 1/k)
 
     def forward(self, z):
@@ -186,7 +186,7 @@ print(f'{mean=} {variance=}, {x.max()=}, {x.min()=}')
 # t = F.normalize(t, dim=-1, p=2.0)
 
 # x = torch.randn(1024*10, 128).to(device)
-train_loader = DataLoader(TensorDataset(x), batch_size=32)
+train_loader = DataLoader(TensorDataset(x), batch_size=1024)
 
 
 # model = RQ(hidden_dim=128, k=256, n_codebook=4).to(device)
